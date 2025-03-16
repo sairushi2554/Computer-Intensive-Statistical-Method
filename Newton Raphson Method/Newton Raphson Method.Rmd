@@ -1,0 +1,526 @@
+---
+title: "Newton-Raphson Method"
+author: "Sairushi Gadakh"
+date: "`r format(Sys.Date() - 180, '%Y-%m-%d')`"
+output: 
+  html_document:
+    code_folding: show
+---
+
+Implementing the Newton-Raphson Method
+
+The Newton-Raphson method is a root-finding algorithm that iteratively improves an estimate of a root of a real-valued function. It is given by the formula:
+
+$$
+M_{n+1} = M_n - \frac{g(M_n)}{g'(M_n)}
+$$
+
+where $g(M)$ is the function whose root we seek, and $g'(M)$ is its derivative.
+
+### 1. Single Variable Case
+
+#### Task:
+
+1.  **Define the function**\
+    Consider the function:
+
+    $$
+    g(M) = 3M^4 - 4M^3 + 0.5
+    $$
+
+    Define this function in R and compute its derivative using the `Deriv` package.
+
+2.  **Implement the Newton-Raphson method**
+
+    -   Write an R script to apply the Newton-Raphson method using **both a while loop and a for loop**.\
+    -   Use the initial guess $M_0 = 0.6$, a stopping criterion of $e = 0.0001$, and a maximum of 100 iterations.
+
+3.  **Output the results**
+
+    -   Display the number of iterations required.\
+    -   Print the approximate root found using each loop implementation.\
+    -   Compare and discuss whether both methods yield the same result.
+
+### Time Complexity Analysis
+
+-   The Newton-Raphson method has a quadratic convergence rate, meaning that in each iteration, the number of correct decimal places roughly doubles.\
+-   In general, its time complexity is **O(log n)** for well-behaved functions where the derivative does not approach zero.\
+-   However, in cases where the function is ill-conditioned or near points where $g'(M)$ is small, convergence may slow down significantly.\
+-   Compare the actual number of iterations required in your implementation with the theoretical complexity.
+
+**Hint:** You may use the `Deriv` package to compute the derivative automatically.
+
+## Newton-Raphson Method Implementation in R
+
+### 1. Using a While Loop
+
+We define the function and compute its derivative using the `Deriv` package.
+
+
+```{r Importing Library, echo=TRUE}
+library(Deriv)  # Load the package for automatic differentiation
+library(MASS)  # For generalized inverse ginv()
+```
+
+
+```{r define_function_f, echo=TRUE}
+# Define the function
+f <- function(M) {
+  3*M^4 - 4*M^3 + (1/2)
+}
+```
+
+```{r compute_derivative_f, echo=TRUE}
+# Compute the derivative of the function
+der <- Deriv(f, "M")
+```
+
+```{r define_derivative_function, echo=TRUE}
+# Define the derivative function
+f_M <- function(M) {
+  der(M)
+}
+```
+
+```{r initialize_variables, echo=TRUE}
+# Initialize variables
+M <- c()  # Store the root approximations
+M0 <- 3/5  # Initial guess
+e <- 0.0001  # Tolerance level
+n <- 100  # Maximum number of iterations
+i <- 1  # Iteration counter
+```
+
+```{r newton_raphson_while_loop, echo=TRUE}
+# Newton-Raphson using while loop
+while (i < n) {
+  M[1] <- M0
+  M[i + 1] <- M[i] - f(M[i]) / f_M(M[i])
+  
+  if (abs(M[i + 1] - M[i]) < e) {
+    cat("Number of iterations required:", i, "\n")
+    cat("Approximate root:", M[i + 1], "\n")
+    break
+  }
+  
+  if (i >= n) {
+    cat("Maximum number of iterations reached.\n")
+    break
+  }
+  
+  i <- i + 1
+}
+```
+
+```{r print_final_approximation, echo=TRUE, message=FALSE, warning=FALSE}
+M  # Print the final approximation
+```
+
+
+### 2. Using a For Loop
+We can implement the same method using a for loop.
+
+```{r newton_raphson_for_loop, echo=TRUE}
+iterations <- 0
+for (i in 1:n) {
+  iterations <- iterations + 1
+  M[1] <- M0
+  M[i + 1] <- M[i] - (f(M[i]) / f_M(M[i]))
+  
+  if (abs(M[i + 1] - M[i]) < e) {
+    print(M)
+    cat("Number of iterations required:", iterations, "\n")
+    cat("Approximate root:", M[i + 1], "\n")
+    break
+  }
+}
+```
+
+### 2. Two-Variable Case
+
+For two variables, the Newton-Raphson method is extended to solve a system of nonlinear equations:
+
+\[
+\begin{bmatrix} x_{n+1} \\ y_{n+1} \end{bmatrix} = \begin{bmatrix} x_n \\ y_n \end{bmatrix} - J^{-1} \begin{bmatrix} f(x_n, y_n) \\ g(x_n, y_n) \end{bmatrix}
+\]
+
+where **\( J \)** is the **Jacobian matrix**, given by:
+
+\[
+J =
+\begin{bmatrix} 
+\frac{\partial f}{\partial x} & \frac{\partial f}{\partial y} \\ 
+\frac{\partial g}{\partial x} & \frac{\partial g}{\partial y} \\ 
+\end{bmatrix}
+\]
+
+```{r define_functions_two_var, echo=TRUE}
+# Define the functions
+f <- function(x, y) x^2 + y^2 - 4
+g <- function(x, y) x*y - 1
+```
+
+
+```{r compute_jacobian_two_var, echo=TRUE}
+# Compute the Jacobian matrix
+J <- function(x, y) matrix(c(2*x, 2*y, y, x), nrow=2, byrow=TRUE)
+```
+
+
+```{r newton_raphson_two_var, echo=TRUE}
+NR_two_var <- function(x0, y0, tol=1e-4, max_iter=100) {
+  xy <- c(x0, y0)
+  x_values <- c(x0)
+  y_values <- c(y0)
+  
+  i <- 1
+  singular_warned <- FALSE  # Flag to ensure singular matrix message is printed only once
+  
+  while (i <= max_iter) {
+    # Compute function values
+    F <- c(f(xy[1], xy[2]), 
+           g(xy[1], xy[2]))
+    
+    # Compute the Jacobian matrix
+    J_eval <- J(xy[1], xy[2])
+    
+    # Check if Jacobian is singular
+    if (abs(det(J_eval)) < 1e-8) {
+      if (!singular_warned) {
+        cat("Jacobian is singular or nearly singular. Using pseudo-inverse.\n")
+        singular_warned <- TRUE  # Set flag to true after first warning
+      }
+      J_inv <- ginv(J_eval)  # Use pseudo-inverse
+    } else {
+      J_inv <- solve(J_eval)  # Regular inverse
+    }
+    
+    # Solve for update step
+    delta_xy <- J_inv %*% (-F)
+    
+    # Update the variables
+    xy_new <- xy + delta_xy
+    
+    # Store values in vectors
+    x_values <- c(x_values, xy_new[1])
+    y_values <- c(y_values, xy_new[2])
+    
+    # Check for convergence
+    if (sum(abs(delta_xy)) < tol) {
+      cat("Converged in", i, "iterations\n")
+      cat("Variable 1 values:", x_values, "\n")
+      cat("Variable 2 values:", y_values, "\n")
+      cat("Converged value of Variable 1:", x_values[length(x_values)], "
+")
+      cat("Converged value of Variable 2:", y_values[length(y_values)], "
+")
+      return(invisible(NULL))
+    }
+    
+    xy <- xy_new
+    i <- i + 1
+  }
+  cat("Maximum iterations reached\n")
+  cat("x values:", x_values, "\n")
+  cat("y values:", y_values, "\n")
+  return(xy)
+}
+```
+
+
+```{r example_call_two_var, echo=TRUE}
+# Example call
+NR_two_var(1, 2)
+```
+
+
+### 3. Three-Variable Case
+
+For three variables, the Newton-Raphson method extends to solve a system of three nonlinear equations:
+
+\[
+\begin{bmatrix} x_{n+1} \\ y_{n+1} \\ z_{n+1} \end{bmatrix} =
+\begin{bmatrix} x_n \\ y_n \\ z_n \end{bmatrix} - J^{-1} 
+\begin{bmatrix} f(x_n, y_n, z_n) \\ g(x_n, y_n, z_n) \\ h(x_n, y_n, z_n) \end{bmatrix}
+\]
+
+where **\( J \)** is the **Jacobian matrix**, given by:
+
+\[
+J =
+\begin{bmatrix} 
+\frac{\partial f}{\partial x} & \frac{\partial f}{\partial y} & \frac{\partial f}{\partial z} \\ 
+\frac{\partial g}{\partial x} & \frac{\partial g}{\partial y} & \frac{\partial g}{\partial z} \\ 
+\frac{\partial h}{\partial x} & \frac{\partial h}{\partial y} & \frac{\partial h}{\partial z} 
+\end{bmatrix}
+\]
+```{r define_functions_three_var, echo=TRUE}
+# Define the functions
+f <- function(x, y, z) x^2 + y^2 + z^2 - 4
+g <- function(x, y, z) x*y + y*z - 1
+h <- function(x, y, z) x + y + z - 3
+```
+
+
+```{r compute_jacobian_three_var, echo=TRUE}
+# Compute the Jacobian matrix
+J <- function(x, y, z) matrix(c(
+  2*x, 2*y, 2*z,
+  y, x + z, y,
+  1, 1, 1
+), nrow=3, byrow=TRUE)
+```
+
+
+```{r newton_raphson_three_var, echo=TRUE}
+NR_three_var <- function(x0, y0, z0, tol=1e-4, max_iter=100) {
+  xyz <- c(x0, y0, z0)
+  var1_values <- c(x0)
+  var2_values <- c(y0)
+  var3_values <- c(z0)
+  
+  i <- 1
+  singular_warned <- FALSE  # Flag to ensure singular matrix message is printed only once
+  
+  while (i <= max_iter) {
+    # Compute function values
+    F <- c(f(xyz[1], xyz[2], xyz[3]), 
+           g(xyz[1], xyz[2], xyz[3]), 
+           h(xyz[1], xyz[2], xyz[3]))
+    
+    # Compute the Jacobian matrix
+    J_eval <- J(xyz[1], xyz[2], xyz[3])
+    
+    # Check if Jacobian is singular
+    if (abs(det(J_eval)) < 1e-8) {
+      if (!singular_warned) {
+        cat("Jacobian is singular or nearly singular. Using pseudo-inverse.\n")
+        singular_warned <- TRUE  # Set flag to true after first warning
+      }
+      J_inv <- ginv(J_eval)  # Use pseudo-inverse
+    } else {
+      J_inv <- solve(J_eval)  # Regular inverse
+    }
+    
+    # Solve for update step
+    delta_xyz <- J_inv %*% (-F)
+    
+    # Update the variables
+    xyz_new <- xyz + delta_xyz
+    
+    # Store values in vectors
+    var1_values <- c(var1_values, xyz_new[1])
+    var2_values <- c(var2_values, xyz_new[2])
+    var3_values <- c(var3_values, xyz_new[3])
+    
+    # Check for convergence
+    if (sum(abs(delta_xyz)) < tol) {
+      cat("Converged in", i, "iterations\n")
+      cat("Variable 1 values:", var1_values, "\n")
+      cat("Variable 2 values:", var2_values, "\n")
+      cat("Variable 3 values:", var3_values, "\n")
+      cat("Converged value of Variable 1:", var1_values[length(var1_values)], "\n")
+      cat("Converged value of Variable 2:", var2_values[length(var2_values)], "\n")
+      cat("Converged value of Variable 3:", var3_values[length(var3_values)], "\n")
+      return(invisible(NULL))
+    }
+    
+    xyz <- xyz_new
+    i <- i + 1
+  }
+  cat("Maximum iterations reached\n")
+  cat("Variable 1 values:", var1_values, "\n")
+  cat("Variable 2 values:", var2_values, "\n")
+  cat("Variable 3 values:", var3_values, "\n")
+  cat("Converged value of Variable 1:", var1_values[length(var1_values)], "\n")
+  cat("Converged value of Variable 2:", var2_values[length(var2_values)], "\n")
+  cat("Converged value of Variable 3:", var3_values[length(var3_values)], "\n")
+  return(invisible(NULL))
+}
+```
+
+
+```{r example_call_three_var, echo=TRUE}
+# Example call
+NR_three_var(1, 1, 1)
+```
+
+
+## Generalized Newton-Raphson Method Implementation in R
+The **Newton-Raphson method** can be generalized to solve systems of **nonlinear equations** with any number of variables. The iterative formula is given by:
+
+\[
+\begin{bmatrix} 
+x_{n+1} \\ 
+y_{n+1} \\ 
+\vdots \\ 
+z_{n+1} 
+\end{bmatrix} =
+\begin{bmatrix} 
+x_n \\ 
+y_n \\ 
+\vdots \\ 
+z_n 
+\end{bmatrix} - J^{-1} 
+\begin{bmatrix} 
+f_1(x_n, y_n, \dots, z_n) \\ 
+f_2(x_n, y_n, \dots, z_n) \\ 
+\vdots \\ 
+f_n(x_n, y_n, \dots, z_n) 
+\end{bmatrix}
+\]
+
+where:
+- \( X_n \) is the vector of variables at iteration \( n \),
+- \( F(X_n) \) is the function vector evaluated at \( X_n \),
+- \( J \) is the Jacobian matrix of **partial derivatives**.
+
+### **Jacobian Matrix in the General Case**
+For a system of \( n \) equations with \( n \) variables:
+
+\[
+J =
+\begin{bmatrix} 
+\frac{\partial f_1}{\partial x_1} & \frac{\partial f_1}{\partial x_2} & \cdots & \frac{\partial f_1}{\partial x_n} \\ 
+\frac{\partial f_2}{\partial x_1} & \frac{\partial f_2}{\partial x_2} & \cdots & \frac{\partial f_2}{\partial x_n} \\ 
+\vdots & \vdots & \ddots & \vdots \\
+\frac{\partial f_n}{\partial x_1} & \frac{\partial f_n}{\partial x_2} & \cdots & \frac{\partial f_n}{\partial x_n}
+\end{bmatrix}
+\]
+```{r newton_raphson_general, echo=TRUE}
+# Generalized Newton-Raphson for any number of variables
+NR_general <- function(F, J, x0, tol=1e-4, max_iter=100) {
+  x <- x0
+  x_values <- list()
+  for (j in 1:length(x0)) {
+    x_values[[j]] <- c(x0[j])  # Initialize storage for each variable
+  }
+  
+  i <- 1
+  singular_warned <- FALSE  # Flag to ensure singular matrix message is printed only once
+  
+  while (i <= max_iter) {
+    # Compute function values
+    F_eval <- F(x)
+    
+    # Compute the Jacobian matrix
+    J_eval <- J(x)
+    
+    # Check if Jacobian is singular
+    if (abs(det(J_eval)) < 1e-8) {
+      if (!singular_warned) {
+        cat("Jacobian is singular or nearly singular. Using pseudo-inverse.\n")
+        singular_warned <- TRUE  # Set flag to true after first warning
+      }
+      J_inv <- ginv(J_eval)  # Use pseudo-inverse
+    } else {
+      J_inv <- solve(J_eval)  # Regular inverse
+    }
+    
+    # Solve for update step
+    delta_x <- J_inv %*% (-F_eval)
+    
+    # Update the variables
+    x_new <- x + delta_x
+    
+    # Store values in vectors
+    for (j in 1:length(x0)) {
+      x_values[[j]] <- c(x_values[[j]], x_new[j])
+    }
+    
+    # Check for convergence
+    if (sum(abs(delta_x)) < tol) {
+      cat("Converged in", i, "iterations\n")
+      for (j in 1:length(x0)) {
+        cat("Variable", j, "values:", x_values[[j]], "\n")
+        cat("Converged value of Variable", j, ":", x_values[[j]][length(x_values[[j]])], "\n")
+      }
+      return(invisible(NULL))
+    }
+    
+    x <- x_new
+    i <- i + 1
+  }
+  cat("Maximum iterations reached\n")
+  for (j in 1:length(x0)) {
+    cat("Variable", j, "values:", x_values[[j]], "\n")
+    cat("Converged value of Variable", j, ":", x_values[[j]][length(x_values[[j]])], "\n")
+  }
+  return(invisible(NULL))
+}
+```
+
+
+```{r example_function_two_var, echo=TRUE}
+# Example Usage
+F_example <- function(x) {
+  c(
+    x[1]^2 + x[2]^2 - 4,
+    x[1] * x[2] - 1
+  )
+}
+```
+
+
+```{r example_jacobian_two_var, echo=TRUE}
+J_example <- function(x) {
+  matrix(c(
+    2*x[1], 2*x[2],
+    x[2], x[1]
+  ), nrow=2, byrow=TRUE)
+}
+```
+
+
+```{r initial_guess, echo=TRUE}
+# Initial guess
+x0 <- c(1, 2)
+```
+
+
+```{r call_NR_general, echo=TRUE}
+# Call generalized Newton-Raphson
+NR_general(F_example, J_example, x0)
+```
+
+
+## Note on Singular Matrices
+
+A **singular matrix** is a square matrix that does not have an inverse. This occurs when its determinant is **zero**:
+
+\[
+\det(J) = 0
+\]
+
+### Causes of Singular Matrices:
+1. **Linear Dependence:** One row or column is a multiple of another.
+2. **Zero Row/Column:** If a row or column contains only zeros, the determinant is zero.
+3. **Highly Correlated Variables:** In systems of equations, if two variables are highly correlated, the Jacobian can become singular.
+
+### Handling Singular Matrices in R:
+- **Check the Determinant:**
+```{r check_singularity, echo=TRUE}
+J <- matrix(c(1, 2, 2, 4), nrow=2)
+det(J)  # Output will be 0, indicating singularity
+```
+
+
+- **Use `ginv()` from `MASS` for a Pseudo-Inverse:**
+```{r compute_pseudo_inverse, echo=TRUE}
+library(MASS)
+ginv(J)  # Computes the pseudo-inverse, allowing further computations
+```
+  
+  
+- **Perturb the Matrix:** Slightly modifying small values can sometimes make it invertible.
+
+```{r perturb_and_solve, echo=TRUE}
+J_perturbed <- J + diag(1e-6, nrow(J))  # Adding a small value to the diagonal
+solve(J_perturbed)
+```
+
+### Importance in Newton-Raphson Method
+In Newton-Raphson, if the Jacobian matrix is singular, it means that the system of equations has a non-unique or undefined solution at that point. Using `ginv()` instead of `solve()` ensures that the method continues instead of failing due to singularity.
+
+Handling singular matrices is crucial in numerical computations, especially in iterative methods like Newton-Raphson. By detecting singularity and applying techniques such as pseudo-inverses, we can make the method more robust and avoid computational failures.
+
